@@ -1,5 +1,5 @@
 use codecrafters_http_server::{Response, ThreadPool};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::{
     collections::HashMap,
@@ -28,9 +28,10 @@ fn main() {
 }
 
 fn handle_connection(mut stream: TcpStream) {
-    let buf_reader = BufReader::new(&stream);
+    let mut buf_reader = BufReader::new(&stream);
 
     let request: Vec<String> = buf_reader
+        .by_ref()
         .lines()
         .map(|line| line.unwrap())
         .take_while(|line| !line.is_empty())
@@ -45,7 +46,26 @@ fn handle_connection(mut stream: TcpStream) {
     }
 
     let path: Vec<&str> = request_line.split(" ").collect();
+    let http_method = path[0];
     let path = path[1];
+
+    let content_length = if request_headers.contains_key("Content-Length") {
+        request_headers
+            .get("Content-Length")
+            .unwrap()
+            .parse()
+            .unwrap_or(0)
+    } else {
+        0
+    };
+
+    let request_body = if http_method == "POST" && content_length > 0 {
+        let mut body = vec![0u8; content_length];
+        buf_reader.read_exact(&mut body).unwrap();
+        String::from_utf8_lossy(&body).to_string()
+    } else {
+        String::new()
+    };
 
     let response = if path == "/" {
         Response::new(
@@ -60,15 +80,14 @@ fn handle_connection(mut stream: TcpStream) {
         let user_agent = request_headers.get("User-Agent").unwrap();
         Response::create_response_with_body(&user_agent)
     } else if path.starts_with("/files/") {
-        let mut file_dir = env::args()
-            .skip_while(|arg| arg != "--directory")
-            .nth(1)
-            .expect("No Directory Argument provided!");
-        if !file_dir.ends_with("/") {
-            file_dir.push_str("/");
+        println!("FILE {:#?}", &path[7..]);
+        let file_path = get_path_arg(&path[7..]);
+
+        match http_method {
+            "GET" => Response::create_file_response(&file_path),
+            "POST" => Response::create_file(&file_path, &request_body),
+            _ => Response::not_found(),
         }
-        let path = format!("{file_dir}{}", &path[7..]);
-        Response::create_file_response(&path)
     } else {
         Response::not_found()
     };
@@ -76,4 +95,21 @@ fn handle_connection(mut stream: TcpStream) {
     stream
         .write_all(&response.create_http_response().unwrap())
         .unwrap();
+}
+
+fn get_path_arg(file_name: &str) -> String {
+    let mut file_dir = env::args()
+        .skip_while(|arg| arg != "--directory")
+        .nth(1)
+        .expect("Directory argument not provided");
+
+    if !file_dir.ends_with("/") {
+        file_dir.push_str("/");
+    }
+
+    println!("File name {}", &file_name);
+
+    let file_path = format!("{file_dir}{}", &file_name);
+    println!("File Path {}", file_path);
+    file_path
 }

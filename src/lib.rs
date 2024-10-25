@@ -75,6 +75,16 @@ impl Response {
         response
     }
 
+    pub fn create_file(file_path: &str, content: &str) -> Response {
+        let _ = fs::write(file_path, content);
+        Response::new(
+            String::from("201"),
+            String::from("Created"),
+            String::from("Content-Length: 0"),
+            String::new(),
+        )
+    }
+
     pub fn create_file_response(path: &str) -> Response {
         let content = fs::read_to_string(&path);
         match content {
