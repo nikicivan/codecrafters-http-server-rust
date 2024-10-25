@@ -78,8 +78,8 @@ impl Response {
         response.add_header("Content-Length", &length.to_string());
 
         if let Some(accept_encoding) = request_headers.get("Accept-Encoding") {
-            if *accept_encoding == "gzip" {
-                response.add_header("Content-Encoding", &accept_encoding);
+            if accept_encoding.contains("gzip") {
+                response.add_header("Content-Encoding", "gzip");
             }
         }
         response
