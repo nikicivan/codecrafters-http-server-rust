@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs,
     sync::{mpsc, Arc, Mutex},
     thread,
@@ -62,7 +63,10 @@ impl Response {
         )
     }
 
-    pub fn create_response_with_body(body: &str) -> Response {
+    pub fn create_response_with_body(
+        body: &str,
+        request_headers: &HashMap<&str, &str>,
+    ) -> Response {
         let length = &body.len();
         let mut response = Response::new(
             String::from("200"),
@@ -72,6 +76,12 @@ impl Response {
         );
         response.add_header("Content-Type", "text/plain");
         response.add_header("Content-Length", &length.to_string());
+
+        if let Some(accept_encoding) = request_headers.get("Accept-Encoding") {
+            if *accept_encoding == "gzip" {
+                response.add_header("Content-Encoding", &accept_encoding);
+            }
+        }
         response
     }
 

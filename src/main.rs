@@ -49,12 +49,8 @@ fn handle_connection(mut stream: TcpStream) {
     let http_method = path[0];
     let path = path[1];
 
-    let content_length = if request_headers.contains_key("Content-Length") {
-        request_headers
-            .get("Content-Length")
-            .unwrap()
-            .parse()
-            .unwrap_or(0)
+    let content_length = if let Some(length) = request_headers.get("Content-Length") {
+        length.parse().unwrap_or(0)
     } else {
         0
     };
@@ -75,10 +71,10 @@ fn handle_connection(mut stream: TcpStream) {
             String::new(),
         )
     } else if path.starts_with("/echo/") {
-        Response::create_response_with_body(&path[6..])
+        Response::create_response_with_body(&path[6..], &request_headers)
     } else if path == "/user-agent" {
         let user_agent = request_headers.get("User-Agent").unwrap();
-        Response::create_response_with_body(&user_agent)
+        Response::create_response_with_body(&user_agent, &request_headers)
     } else if path.starts_with("/files/") {
         println!("FILE {:#?}", &path[7..]);
         let file_path = get_path_arg(&path[7..]);
