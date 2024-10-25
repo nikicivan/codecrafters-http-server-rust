@@ -71,10 +71,18 @@ fn handle_connection(mut stream: TcpStream) {
             String::new(),
         )
     } else if path.starts_with("/echo/") {
-        Response::create_response_with_body(&path[6..], &request_headers)
+        if let Some(encoding) = request_headers.get("Accept-Encoding") {
+            if encoding.contains("gzip") {
+                let response =
+                    Response::create_gzip_response(&path.strip_prefix("/echo/").unwrap());
+                stream.write_all(&response).unwrap();
+                return;
+            }
+        }
+        Response::create_response_with_body(&path[6..])
     } else if path == "/user-agent" {
         let user_agent = request_headers.get("User-Agent").unwrap();
-        Response::create_response_with_body(&user_agent, &request_headers)
+        Response::create_response_with_body(&user_agent)
     } else if path.starts_with("/files/") {
         println!("FILE {:#?}", &path[7..]);
         let file_path = get_path_arg(&path[7..]);

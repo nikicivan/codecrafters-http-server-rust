@@ -1,6 +1,8 @@
+use flate2::{write::GzEncoder, Compression};
 use std::{
     collections::HashMap,
     fs,
+    io::Write,
     sync::{mpsc, Arc, Mutex},
     thread,
 };
@@ -38,7 +40,7 @@ impl Response {
     }
 
     pub fn set_body(&mut self, body: String) {
-        self.body = body;
+        self.body = String::from(body);
     }
 
     pub fn create_http_response(&self) -> Result<Vec<u8>, ()> {
@@ -63,11 +65,7 @@ impl Response {
         )
     }
 
-    pub fn create_response_with_body(
-        body: &str,
-        request_headers: &HashMap<&str, &str>,
-    ) -> Response {
-        let length = &body.len();
+    pub fn create_response_with_body(body: &str) -> Response {
         let mut response = Response::new(
             String::from("200"),
             String::from("OK"),
@@ -75,13 +73,31 @@ impl Response {
             String::from(body),
         );
         response.add_header("Content-Type", "text/plain");
-        response.add_header("Content-Length", &length.to_string());
+        response.add_header("Content-Length", &body.len().to_string());
+        response
+    }
 
-        if let Some(accept_encoding) = request_headers.get("Accept-Encoding") {
-            if accept_encoding.contains("gzip") {
-                response.add_header("Content-Encoding", "gzip");
-            }
-        }
+    pub fn create_gzip_response(body: &str) -> Vec<u8> {
+        let mut response = Response::new(
+            String::from("200"),
+            String::from("OK"),
+            String::new(),
+            String::from(body),
+        );
+
+        response.add_header("Content-Encoding", "gzip");
+        let mut gz = GzEncoder::new(vec![], Compression::default());
+        _ = gz.write_all(&body.as_bytes()).unwrap();
+        let comp_body = gz.finish().unwrap();
+        response.add_header("Content-Length", &comp_body.len().to_string());
+
+        let mut response = format!(
+            "HTTP/1.1 {} {}\r\n{}\r\n",
+            response.status_code, response.status_message, response.headers
+        )
+        .into_bytes();
+
+        response.extend_from_slice(&comp_body);
         response
     }
 
