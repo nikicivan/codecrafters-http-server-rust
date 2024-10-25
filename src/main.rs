@@ -1,6 +1,6 @@
 use std::{
-    io::{BufWriter, Write},
-    net::TcpListener,
+    io::{BufRead, BufReader, Write},
+    net::{TcpListener, TcpStream},
 };
 
 fn main() {
@@ -12,29 +12,24 @@ fn main() {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                let mut writer = BufWriter::new(stream);
-                /*
-                 * Response format is
-                 * ```
-                 * HTTP-Version Status-Code Reason-Phrase CRLF
-                 * headers CRLF
-                 * message-body
-                 * ```
-                 * as defined in rfc9112 2.1 message format
-                 */
-                let message = "HTTP/1.1 200 OK\r\n\r\n";
-                match writer.write_all(message.as_bytes()) {
-                    Ok(_) => writer.flush().unwrap_or_else(|writer_flush_error| {
-                        println!("Failed to flush writer stream: {}", writer_flush_error);
-                    }),
-                    Err(stream_write_error) => {
-                        println!("Failed to write to stream: {}", stream_write_error);
-                    }
-                }
+                handle_connection(stream);
             }
             Err(stream_error) => {
                 println!("stream error: {}", stream_error);
             }
         }
     }
+}
+
+fn handle_connection(mut stream: TcpStream) {
+    let buf_reader = BufReader::new(&mut stream);
+
+    let request_line = buf_reader.lines().next().unwrap().unwrap();
+
+    let response = match request_line.as_str() {
+        "GET / HTTP/1.1" => "HTTP/1.1 200 OK\r\n\r\n",
+        _ => "HTTP/1.1 404 Not Found\r\n\r\n",
+    };
+
+    stream.write_all(response.as_bytes()).unwrap();
 }
