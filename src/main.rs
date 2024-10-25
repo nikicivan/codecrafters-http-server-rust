@@ -2,6 +2,7 @@ use std::{
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
 };
+use threadpool::ThreadPool;
 
 #[derive(Debug)]
 enum HttpRequestMethod {
@@ -59,13 +60,16 @@ impl<'a> HttpRequest<'a> {
 fn main() {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     println!("Logs from your program will appear here!");
+    let pool = ThreadPool::new(4);
 
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
 
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                handle_connection(stream);
+                pool.execute(|| {
+                    handle_connection(stream);
+                });
             }
             Err(stream_error) => {
                 println!("stream error: {}", stream_error);
